@@ -65,7 +65,6 @@
     .loading-orb {
       animation: pulseGlow 1.3s ease-in-out infinite;
     }
-    /* one run, then stay filled */
     .loading-bar {
       animation: barFill 1.4s ease-in-out 1 forwards;
     }
@@ -80,7 +79,7 @@
         Initializing
       </div>
       <div class="text-3xl lg:text-4xl font-extrabold">
-        Nexus Siege
+        Nexus Siege TD
       </div>
       <div class="text-xs text-slate-400 mt-1">
         Preparing your defenses...
@@ -107,7 +106,7 @@
   </div>
 
   <h1 class="text-3xl lg:text-4xl font-extrabold mb-4 text-center">
-    Nexus Siege: Tower Defense
+    Nexus Siege TD
   </h1>
 
   <!-- ========= MAIN MENU ========= -->
@@ -115,7 +114,7 @@
     <div class="bg-slate-900/80 rounded-2xl border border-slate-700 p-5 lg:p-6 shadow-2xl">
       <h2 class="text-2xl font-bold mb-4 text-center">Select Your Battle</h2>
 
-      <!-- Map selector with arrows + smaller preview -->
+      <!-- Map selector -->
       <div class="mb-4">
         <div class="text-sm font-semibold mb-2 text-slate-200">Map</div>
         <div class="flex items-center gap-3">
@@ -203,13 +202,13 @@
         <div id="waveDisplay" class="text-2xl font-bold text-sky-400 leading-none">1 / 10</div>
       </div>
 
-      <!-- Controls card -->
+      <!-- Controls -->
       <div class="bg-slate-900 rounded-xl border border-slate-700 px-4 py-3 flex flex-col justify-between h-20 lg:h-auto">
         <button id="startWaveBtn"
                 class="w-full mb-2 py-2 rounded-lg font-semibold bg-emerald-600 hover:bg-emerald-500 transition shadow-md text-sm">
           Start Wave
         </button>
-        <div class="flex gap-2">
+        <div class="flex gap-2 mb-2">
           <button id="speedBtn"
                   class="flex-1 py-1.5 rounded-lg text-xs bg-slate-800 hover:bg-slate-700 border border-slate-600">
             Speed: 1x
@@ -219,6 +218,11 @@
             Pause
           </button>
         </div>
+        <button id="homeBtn"
+                class="w-full py-1.5 rounded-lg text-xs bg-slate-900 border border-sky-500 text-sky-300 hover:bg-slate-800 hover:text-sky-100 flex items-center justify-center gap-1 shadow-sm">
+          <span>⮌</span>
+          <span>Main Menu</span>
+        </button>
       </div>
     </div>
 
@@ -301,7 +305,7 @@
           <p id="buildHint" class="mt-2 text-xs text-amber-300 h-4"></p>
         </div>
 
-        <!-- Sandbox Controls (only visible in sandbox mode) -->
+        <!-- Sandbox Controls -->
         <div id="sandboxPanel" class="bg-slate-900 rounded-xl border border-slate-700 p-4 hidden">
           <h2 class="text-lg font-semibold mb-2">Sandbox Tools</h2>
           <label class="block text-[11px] text-slate-300 mb-1">
@@ -385,6 +389,7 @@
       const menuSummary = document.getElementById("menuSummary");
       const menuBtn1    = document.getElementById("menuBtn1");
       const menuBtn2    = document.getElementById("menuBtn2");
+      const homeBtn     = document.getElementById("homeBtn");
 
       // HUD elements
       const moneyDisplay  = document.getElementById("moneyDisplay");
@@ -426,7 +431,7 @@
       // GAME STATE
       let money   = 220;
       let lives   = 20;
-      let wave    = 1;        // current/next wave number
+      let wave    = 1;
       let maxWave = 10;
 
       let enemies     = [];
@@ -436,7 +441,7 @@
       let gamePhase   = "build"; // build | wave | over | victory
       let isPaused    = false;
       let gameSpeed   = 1;       // 1, 2, 3
-      let autoWaves   = false;   // once true, waves chain automatically
+      let autoWaves   = false;
 
       let spawnQueue = [];
       let spawnTimer = 0;
@@ -538,7 +543,7 @@
       // MENU STATE
       let selectedMapId = currentMap.id;
       let selectedDifficulty = "normal";
-      let selectedMode = "standard";
+      let selectedMode = "standard";   // initial mode
       let sandboxStartWave = 1;
 
       const DIFFICULTY_CONFIG = {
@@ -551,34 +556,41 @@
       let diffSpeedScale = 1;
 
       const MODE_CONFIG = {
-        standard: { maxWave: 10, sandbox: false, endless: false },
-        endless:  { maxWave: Infinity, sandbox: false, endless: true },
-        sandbox:  { maxWave: Infinity, sandbox: true, endless: true }
+        standard: { maxWave: 10,        sandbox: false, endless: false },
+        endless:  { maxWave: Infinity,  sandbox: false, endless: true  },
+        sandbox:  { maxWave: Infinity,  sandbox: true,  endless: true  }
       };
+
+      // SAFE mode helpers (fix sandbox error)
+      function getModeConfig() {
+        const cfg = MODE_CONFIG[selectedMode];
+        return cfg || MODE_CONFIG["standard"];
+      }
+      function isSandboxMode() {
+        return !!getModeConfig().sandbox;
+      }
 
       let path = currentMap.path;
       const PATH_WIDTH = 46;
       const TOWER_RADIUS = 20;
 
-      const isSandboxMode = () => MODE_CONFIG[selectedMode].sandbox;
-
       // Mouse
       const mouse = { x: 0, y: 0, over: false };
-      let selectedTowerType = null;   // blueprint id
-      let selectedPlacedTower = null; // tower instance
+      let selectedTowerType = null;
+      let selectedPlacedTower = null;
 
       // TOWER / ENEMY CONFIG
       const TOWER_CONFIG = {
         archer: {
           name: "Archer Tower",
           cost: 60,
-          range: 160,          // buffed range
-          damage: 14,          // buffed damage
-          fireDelay: 0.45,     // faster firing
+          range: 160,
+          damage: 14,
+          fireDelay: 0.45,
           color: "#22c55e",
           upgradeCost: 40,
           sellValue: 30,
-          projectile: { speed: 280, size: 4, color: "#facc15" }  // slightly faster arrow
+          projectile: { speed: 280, size: 4, color: "#facc15" }
         },
         mage: {
           name: "Wizard Tower",
@@ -616,7 +628,7 @@
       };
 
       const ENEMY_TYPES = {
-        goblin: { name: "Goblin", baseHp: 40, speed: 50, reward: 8, color: "#f97316", radius: 11 },
+        goblin: { name: "Goblin", baseHp: 40, speed: 50, reward: 8,  color: "#f97316", radius: 11 },
         orc:    { name: "Orc",    baseHp: 110, speed: 35, reward: 18, color: "#dc2626", radius: 15 },
         wraith: { name: "Wraith", baseHp: 70, speed: 80, reward: 15, color: "#a855f7", radius: 10 }
       };
@@ -630,10 +642,10 @@
           entries.push({ type: "wraith", count: 4, interval: 0.9 });
         } else if (n === 3) {
           entries.push({ type: "goblin", count: 15, interval: 0.7 });
-          entries.push({ type: "orc",    count: 3, interval: 1.2 });
+          entries.push({ type: "orc",    count: 3,  interval: 1.2 });
         } else if (n === 4) {
           entries.push({ type: "goblin", count: 16, interval: 0.6 });
-          entries.push({ type: "wraith", count: 6, interval: 0.8 });
+          entries.push({ type: "wraith", count: 6,  interval: 0.8 });
         } else if (n === 5) {
           entries.push({ type: "orc",    count: 7,  interval: 1.0 });
           entries.push({ type: "wraith", count: 8,  interval: 0.9 });
@@ -642,16 +654,16 @@
           entries.push({ type: "orc",    count: 8,  interval: 1.1 });
           entries.push({ type: "wraith", count: 8,  interval: 0.8 });
         } else if (n === 7) {
-          entries.push({ type: "orc", count: 10, interval: 0.9 });
+          entries.push({ type: "orc",    count: 10, interval: 0.9 });
           entries.push({ type: "wraith", count: 10, interval: 0.75 });
         } else if (n === 8) {
           entries.push({ type: "goblin", count: 24, interval: 0.55 });
-          entries.push({ type: "orc", count: 10, interval: 0.9 });
+          entries.push({ type: "orc",    count: 10, interval: 0.9 });
         } else if (n === 9) {
-          entries.push({ type: "orc", count: 12, interval: 0.8 });
+          entries.push({ type: "orc",    count: 12, interval: 0.8 });
           entries.push({ type: "wraith", count: 14, interval: 0.7 });
         } else if (n === 10) {
-          entries.push({ type: "orc", count: 16, interval: 0.85 });
+          entries.push({ type: "orc",    count: 16, interval: 0.85 });
           entries.push({ type: "wraith", count: 16, interval: 0.7 });
         } else {
           const extra = n - 10;
@@ -723,7 +735,7 @@
         }, 1200);
       }
 
-      // ENEMY CLASS
+      // ENEMY
       class Enemy {
         constructor(typeId, waveNumber) {
           const base = ENEMY_TYPES[typeId];
@@ -840,7 +852,7 @@
         }
       }
 
-      // TOWER CLASS
+      // TOWER
       class Tower {
         constructor(x, y, blueprint) {
           this.x = x;
@@ -859,79 +871,77 @@
           this.sellValue = blueprint.sellValue;
 
           this.target = null;
-          this.targetMode = "first"; // first, last, strong, close
+          this.targetMode = "first";
 
           this.lastShotAngle = 0;
           this.shotAnimTimer = 0;
         }
 
-        // SAFER TARGET PICKER (no freezes)
         pickTarget() {
           const inRange = [];
           for (const e of enemies) {
-            if (e && e.hp > 0 && dist(this, e) <= this.range) {
+            if (!e) continue;
+            if (e.hp > 0 && Number.isFinite(e.x) && Number.isFinite(e.y) && dist(this, e) <= this.range) {
               inRange.push(e);
             }
           }
           if (!inRange.length) return null;
 
           const progressOf = (e) => {
-            const pi = typeof e.pathIndex === "number" ? e.pathIndex : 0;
-            const pr = typeof e.progress === "number" ? e.progress : 0;
+            const pi = Number.isFinite(e.pathIndex) ? e.pathIndex : 0;
+            const pr = Number.isFinite(e.progress)   ? e.progress   : 0;
             return pi + pr;
           };
 
           let chosen = inRange[0];
+          const mode = this.targetMode || "first";
 
-          if (this.targetMode === "first") {
+          if (mode === "first") {
             let bestScore = progressOf(chosen);
             for (const e of inRange) {
               const s = progressOf(e);
-              if (s > bestScore) {
-                bestScore = s;
-                chosen = e;
-              }
+              if (s > bestScore) { bestScore = s; chosen = e; }
             }
-          } else if (this.targetMode === "last") {
+          } else if (mode === "last") {
             let bestScore = progressOf(chosen);
             for (const e of inRange) {
               const s = progressOf(e);
-              if (s < bestScore) {
-                bestScore = s;
-                chosen = e;
-              }
+              if (s < bestScore) { bestScore = s; chosen = e; }
             }
-          } else if (this.targetMode === "strong") {
+          } else if (mode === "strong") {
             let bestHp = chosen.hp;
             for (const e of inRange) {
-              if (e.hp > bestHp) {
-                bestHp = e.hp;
-                chosen = e;
-              }
+              if (e.hp > bestHp) { bestHp = e.hp; chosen = e; }
             }
-          } else if (this.targetMode === "close") {
+          } else if (mode === "close") {
             let bestDist = dist(this, chosen);
             for (const e of inRange) {
               const d = dist(this, e);
-              if (d < bestDist) {
-                bestDist = d;
-                chosen = e;
-              }
+              if (d < bestDist) { bestDist = d; chosen = e; }
             }
           }
 
           return chosen;
         }
 
+        // UPDATED: Strong mode constantly re-evaluates strongest target
         update(dt) {
           this.fireTimer -= dt;
           if (this.shotAnimTimer > 0) this.shotAnimTimer -= dt;
 
-          if (this.target && (this.target.hp <= 0 || dist(this, this.target) > this.range)) {
+          // drop target if invalid
+          if (
+            !this.target ||
+            this.target.hp <= 0 ||
+            !Number.isFinite(this.target.x) ||
+            !Number.isFinite(this.target.y) ||
+            dist(this, this.target) > this.range
+          ) {
             this.target = null;
           }
 
-          if (!this.target) {
+          // for strong: always re-pick; for others: only when we lost target
+          if (!this.target || this.targetMode === "strong") {
             this.target = this.pickTarget();
           }
 
@@ -1089,7 +1099,7 @@
         }
       }
 
-      // PROJECTILE CLASS
+      // PROJECTILE (extra defensive)
       class Projectile {
         constructor(x, y, target, damage, speed, size, color, splashRadius, slowFactor, slowDuration) {
           this.x = x;
@@ -1107,13 +1117,38 @@
 
         update(dt) {
           if (!this.alive) return;
-          if (!this.target || this.target.hp <= 0) {
+
+          if (
+            !this.target ||
+            this.target.hp <= 0 ||
+            !Number.isFinite(this.target.x) ||
+            !Number.isFinite(this.target.y)
+          ) {
             this.alive = false;
             return;
           }
+
           const dx = this.target.x - this.x;
           const dy = this.target.y - this.y;
-          const d = Math.sqrt(dx*dx + dy*dy);
+          const d  = Math.sqrt(dx*dx + dy*dy);
+
+          if (!Number.isFinite(d) || d === 0) {
+            if (this.splashRadius > 0) {
+              for (const e of enemies) {
+                if (dist(this, e) <= this.splashRadius) {
+                  e.takeDamage(this.damage);
+                }
+              }
+            } else if (this.target && this.target.hp > 0) {
+              this.target.takeDamage(this.damage);
+              if (this.slowFactor) {
+                this.target.applySlow(this.slowFactor, this.slowDuration);
+              }
+            }
+            this.alive = false;
+            return;
+          }
+
           if (d < this.speed * dt + 2) {
             if (this.splashRadius > 0) {
               for (const e of enemies) {
@@ -1122,20 +1157,29 @@
                 }
               }
             } else {
-              this.target.takeDamage(this.damage);
-              if (this.slowFactor) {
-                this.target.applySlow(this.slowFactor, this.slowDuration);
+              if (this.target && this.target.hp > 0) {
+                this.target.takeDamage(this.damage);
+                if (this.slowFactor) {
+                  this.target.applySlow(this.slowFactor, this.slowDuration);
+                }
               }
             }
             this.alive = false;
           } else {
-            const nx = dx / d, ny = dy / d;
+            const nx = dx / d;
+            const ny = dy / d;
+            if (!Number.isFinite(nx) || !Number.isFinite(ny)) {
+              this.alive = false;
+              return;
+            }
             this.x += nx * this.speed * dt;
             this.y += ny * this.speed * dt;
           }
         }
 
         draw(ctx) {
+          if (!this.alive) return;
+
           ctx.save();
           ctx.translate(this.x, this.y);
 
@@ -1334,7 +1378,7 @@
 
       function resetGame() {
         const diffCfg = DIFFICULTY_CONFIG[selectedDifficulty];
-        const modeCfg = MODE_CONFIG[selectedMode];
+        const modeCfg = getModeConfig();
 
         diffHpScale = diffCfg.hpScale;
         diffSpeedScale = diffCfg.speedScale;
@@ -1383,7 +1427,7 @@
         updateHUD();
       }
 
-      // CLEAN BACKGROUND
+      // DRAW
       function drawBackground() {
         ctx.fillStyle = currentMap.groundColor;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -1429,12 +1473,12 @@
         ctx.save();
         ctx.translate(end.x, end.y);
         const t = (performance.now()/1000);
-        const pulse = 1 + 0.08*Math.sin(t*5);
+        thePulse = 1 + 0.08*Math.sin(t*5);
 
         const r = 24;
         ctx.fillStyle = "rgba(56,189,248,0.13)";
         ctx.beginPath();
-        ctx.arc(0,0,r*3*pulse,0,Math.PI*2);
+        ctx.arc(0,0,r*3*thePulse,0,Math.PI*2);
         ctx.fill();
 
         ctx.fillStyle = "#020617";
@@ -1471,64 +1515,70 @@
         ctx.restore();
       }
 
+      // MAIN LOOP
       function tick(now) {
         const rawDt = (now - lastTime) / 1000;
         lastTime = now;
         const dt = Math.min(rawDt, 0.05) * (isPaused ? 0 : gameSpeed);
 
-        if (!isPaused) {
-          if (gamePhase === "wave") {
-            spawnTimer += dt;
-            while (spawnQueue.length && spawnQueue[0].time <= spawnTimer) {
-              const eSpec = spawnQueue.shift();
-              enemies.push(new Enemy(eSpec.typeId, wave));
+        try {
+          if (!isPaused) {
+            if (gamePhase === "wave") {
+              spawnTimer += dt;
+              while (spawnQueue.length && spawnQueue[0].time <= spawnTimer) {
+                const eSpec = spawnQueue.shift();
+                enemies.push(new Enemy(eSpec.typeId, wave));
+              }
             }
-          }
 
-          for (const e of enemies)   e.update(dt);
-          for (const t of towers)    t.update(dt);
-          for (const p of projectiles) p.update(dt);
+            for (const e of enemies)   e.update(dt);
+            for (const t of towers)    t.update(dt);
+            for (const p of projectiles) p.update(dt);
 
-          enemies = enemies.filter(e => e.hp > 0);
-          projectiles = projectiles.filter(p => p.alive);
+            enemies = enemies.filter(e => e.hp > 0);
+            projectiles = projectiles.filter(p => p.alive);
 
-          if (gamePhase === "wave" && enemies.length === 0 && spawnQueue.length === 0) {
-            const finishedWave = wave;
+            if (gamePhase === "wave" && enemies.length === 0 && spawnQueue.length === 0) {
+              const finishedWave = wave;
+              const modeCfg = getModeConfig();
 
-            if (!MODE_CONFIG[selectedMode].endless &&
-                isFinite(maxWave) &&
-                finishedWave >= maxWave) {
-              gamePhase = "victory";
-              updateHUD();
-              victoryModal.classList.remove("hidden");
-            } else {
-              gamePhase = "build";
-              wave = finishedWave + 1;
-              updateHUD();
-
-              if (autoWaves) {
-                startNextWave();
+              if (!modeCfg.endless &&
+                  isFinite(maxWave) &&
+                  finishedWave >= maxWave) {
+                gamePhase = "victory";
+                updateHUD();
+                victoryModal.classList.remove("hidden");
               } else {
-                if (isFinite(maxWave)) {
-                  startWaveBtn.textContent = "Start Wave";
-                  startWaveBtn.disabled = (wave > maxWave);
+                gamePhase = "build";
+                wave = finishedWave + 1;
+                updateHUD();
+
+                if (autoWaves) {
+                  startNextWave();
+                } else {
+                  if (isFinite(maxWave)) {
+                    startWaveBtn.textContent = "Start Wave";
+                    startWaveBtn.disabled = (wave > maxWave);
+                  }
                 }
               }
             }
+
+            checkEndConditions();
           }
 
-          checkEndConditions();
+          ctx.clearRect(0,0,canvas.width,canvas.height);
+          drawBackground();
+          drawPath();
+          drawBaseCrystal();
+
+          for (const t of towers) t.draw(ctx);
+          for (const e of enemies) e.draw(ctx);
+          for (const p of projectiles) p.draw(ctx);
+          drawPlacementGhost();
+        } catch (err) {
+          console.error("Game loop error:", err);
         }
-
-        ctx.clearRect(0,0,canvas.width,canvas.height);
-        drawBackground();
-        drawPath();
-        drawBaseCrystal();
-
-        for (const t of towers) t.draw(ctx);
-        for (const e of enemies) e.draw(ctx);
-        for (const p of projectiles) p.draw(ctx);
-        drawPlacementGhost();
 
         requestAnimationFrame(tick);
       }
@@ -1572,10 +1622,10 @@
         mapPreviewCtx.stroke();
 
         mapPreviewCtx.lineWidth = PATH_WIDTH * sx;
-        const grad = mapPreviewCtx.createLinearGradient(0,0,pw,ph);
-        grad.addColorStop(0,m.pathColor1);
-        grad.addColorStop(1,m.pathColor2);
-        mapPreviewCtx.strokeStyle = grad;
+        const grad2 = mapPreviewCtx.createLinearGradient(0,0,pw,ph);
+        grad2.addColorStop(0,m.pathColor1);
+        grad2.addColorStop(1,m.pathColor2);
+        mapPreviewCtx.strokeStyle = grad2;
         mapPreviewCtx.beginPath();
         mapPreviewCtx.moveTo(m.path[0].x*sx, m.path[0].y*sy);
         for (let i=1;i<m.path.length;i++) {
@@ -1638,16 +1688,33 @@
       });
 
       function goToMenu() {
-        gameUI.classList.add("hidden");
-        mainMenu.classList.remove("hidden");
+        autoWaves = false;
+        gamePhase = "build";
+        isPaused = false;
+        gameSpeed = 1;
+        enemies = [];
+        projectiles = [];
+        spawnQueue = [];
+        towers = [];
+        selectedTowerType = null;
+        selectedPlacedTower = null;
+        hideTowerInfo();
+        startWaveBtn.textContent = "Start Wave";
+        startWaveBtn.disabled = false;
+        speedBtn.textContent = "Speed: 1x";
+        pauseBtn.textContent = "Pause";
+
         gameOverModal.classList.add("hidden");
         victoryModal.classList.add("hidden");
+
+        gameUI.classList.add("hidden");
+        mainMenu.classList.remove("hidden");
       }
 
       menuBtn1.addEventListener("click", goToMenu);
       menuBtn2.addEventListener("click", goToMenu);
+      homeBtn.addEventListener("click", goToMenu);
 
-      // Sandbox "go to wave" button
       sandboxApplyBtn.addEventListener("click", () => {
         if (!isSandboxMode()) return;
         const sw = parseInt(sandboxWaveInput.value || "1", 10);
@@ -1673,7 +1740,6 @@
         updateHUD();
       });
 
-      // Highlight defaults
       diffButtons.find(b => b.dataset.difficulty === "normal").classList.add("selected");
       modeButtons.find(b => b.dataset.mode === "standard").classList.add("selected");
       setMapIndex(0);
@@ -1704,7 +1770,6 @@
         }
       });
 
-      // Start button = turn on auto-waves and start the first one
       startWaveBtn.addEventListener("click", () => {
         if (gamePhase !== "build" || autoWaves) return;
         autoWaves = true;
@@ -1731,10 +1796,15 @@
         hideTowerInfo();
       });
 
+      // Changing target mode
       targetModeButtons.forEach(btn => {
         btn.addEventListener("click", () => {
           if (!selectedPlacedTower) return;
+
           selectedPlacedTower.targetMode = btn.dataset.mode;
+          selectedPlacedTower.target = null;
+          selectedPlacedTower.fireTimer = 0;
+
           refreshTowerInfo();
         });
       });
@@ -1742,11 +1812,10 @@
       retryBtn1.addEventListener("click", () => resetGame());
       retryBtn2.addEventListener("click", () => resetGame());
 
-      // Kick off game loop
       updateHUD();
       requestAnimationFrame(tick);
 
-      // ==== INTERACTIVE LOADING SCREEN ====
+      // LOADING SCREEN -> START BUTTON
       function showStartButton() {
         const startBtn = document.createElement('button');
         startBtn.textContent = 'Start Adventure';
@@ -1769,8 +1838,7 @@
         loadingScreen.appendChild(startBtn);
       }
 
-      // Show the Start Adventure button after a short delay
-      setTimeout(showStartButton, 2000);
+      setTimeout(showStartButton, 1200);
     });
   </script>
 </body>
