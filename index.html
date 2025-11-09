@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Nexus Siege TD Battles </title>
+  <title>Nexus Siege TD – Map Selector + Sandbox Waves</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     body { font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
@@ -65,7 +65,7 @@
     .loading-orb {
       animation: pulseGlow 1.3s ease-in-out infinite;
     }
-    /* CHANGED: one run, then stay filled */
+    /* one run, then stay filled */
     .loading-bar {
       animation: barFill 1.4s ease-in-out 1 forwards;
     }
@@ -111,7 +111,7 @@
   </h1>
 
   <!-- ========= MAIN MENU ========= -->
-  <div id="mainMenu" class="hidden w-full max-w-4xl mt-2">
+  <div id="mainMenu" class="w-full max-w-4xl mt-2 hidden">
     <div class="bg-slate-900/80 rounded-2xl border border-slate-700 p-5 lg:p-6 shadow-2xl">
       <h2 class="text-2xl font-bold mb-4 text-center">Select Your Battle</h2>
 
@@ -572,13 +572,13 @@
         archer: {
           name: "Archer Tower",
           cost: 60,
-          range: 140,
-          damage: 8,
-          fireDelay: 0.55,
+          range: 160,          // buffed range
+          damage: 14,          // buffed damage
+          fireDelay: 0.45,     // faster firing
           color: "#22c55e",
           upgradeCost: 40,
           sellValue: 30,
-          projectile: { speed: 260, size: 4, color: "#facc15" }
+          projectile: { speed: 280, size: 4, color: "#facc15" }  // slightly faster arrow
         },
         mage: {
           name: "Wizard Tower",
@@ -865,38 +865,61 @@
           this.shotAnimTimer = 0;
         }
 
+        // SAFER TARGET PICKER (no freezes)
         pickTarget() {
-          const candidates = [];
+          const inRange = [];
           for (const e of enemies) {
-            if (dist(this, e) <= this.range && e.hp > 0) {
-              candidates.push(e);
+            if (e && e.hp > 0 && dist(this, e) <= this.range) {
+              inRange.push(e);
             }
           }
-          if (!candidates.length) return null;
+          if (!inRange.length) return null;
 
-          let chosen = candidates[0];
+          const progressOf = (e) => {
+            const pi = typeof e.pathIndex === "number" ? e.pathIndex : 0;
+            const pr = typeof e.progress === "number" ? e.progress : 0;
+            return pi + pr;
+          };
+
+          let chosen = inRange[0];
+
           if (this.targetMode === "first") {
-            let best = -1;
-            for (const e of candidates) {
-              if (e.distanceScore > best) { best = e.distanceScore; chosen = e; }
+            let bestScore = progressOf(chosen);
+            for (const e of inRange) {
+              const s = progressOf(e);
+              if (s > bestScore) {
+                bestScore = s;
+                chosen = e;
+              }
             }
           } else if (this.targetMode === "last") {
-            let best = Infinity;
-            for (const e of candidates) {
-              if (e.distanceScore < best) { best = e.distanceScore; chosen = e; }
+            let bestScore = progressOf(chosen);
+            for (const e of inRange) {
+              const s = progressOf(e);
+              if (s < bestScore) {
+                bestScore = s;
+                chosen = e;
+              }
             }
           } else if (this.targetMode === "strong") {
-            let best = -1;
-            for (const e of candidates) {
-              if (e.hp > best) { best = e.hp; chosen = e; }
+            let bestHp = chosen.hp;
+            for (const e of inRange) {
+              if (e.hp > bestHp) {
+                bestHp = e.hp;
+                chosen = e;
+              }
             }
           } else if (this.targetMode === "close") {
-            let best = Infinity;
-            for (const e of candidates) {
+            let bestDist = dist(this, chosen);
+            for (const e of inRange) {
               const d = dist(this, e);
-              if (d < best) { best = d; chosen = e; }
+              if (d < bestDist) {
+                bestDist = d;
+                chosen = e;
+              }
             }
           }
+
           return chosen;
         }
 
